@@ -115,15 +115,12 @@ def get_acodec_args(osi, audio_codec, audio_bitrate):
     args += '-b:a%s %sk ' % (postfix, audio_bitrate)
     return args
 
-def get_dash_mux_args(enc_params):
+def get_dash_mux_args(enc_params, curr_time):
     segment_size = wc_utils.to_int(enc_params['output']['segment_size'])
-
-    now = datetime.datetime.now()
-    curr_time = str(now.hour) +  str(now.minute) + str(now.second)
 
     if enc_params['output']['seg_in_subfolder'] == 'on' :
         chunk_name = '%s/chunk-stream_\$RepresentationID\$-\$Number%%05d\$.\$ext\$' %(curr_time)
-        init_seg_name = '%s/init-stream\$RepresentationID\$.\$ext\$' %(curr_time)
+        init_seg_name = '%s/init-stream_\$RepresentationID\$.\$ext\$' %(curr_time)
     else:
         chunk_name = 'chunk-stream_%s_\$RepresentationID\$-\$Number%%05d\$.\$ext\$' %(curr_time)
         init_seg_name = 'init-stream_%s_\$RepresentationID\$.\$ext\$' %(curr_time)
@@ -188,13 +185,13 @@ def get_hls_mux_args(enc_params, hls_ingest_url):
                 var_stream_map += ",ccgroup\:%s" %ccgroup_name
 
     if enc_params['output']['seg_in_subfolder'] == 'on' :
-        hls_segment_filename = '%s/variant_%%v/stream_%02d%02d%02d_%%d.ts' %\
+        hls_segment_filename = '%s/variant_%%v/stream_%s_%%d.ts' %\
                                (ffmpeg_out_url.replace(':', '\:'),
-                                now.hour, now.minute, now.second)
+                                now.strftime('%Y%m%dT%H%M%S'))
     else:
-        hls_segment_filename = '%s/stream_%02d%02d%02d_%%v_%%d.ts' %\
+        hls_segment_filename = '%s/stream_%s_%%v_%%d.ts' %\
                                (ffmpeg_out_url.replace(':', '\:'),
-                                now.hour, now.minute, now.second)
+                                now.strftime('%Y%m%dT%H%M%S'))
 
     hls_flags = 'program_date_time+round_durations'
 
@@ -332,16 +329,19 @@ def get_args(enc_params):
     elif (out_type == 'DASH' or out_type == 'CMAF'):
         dash_ingest_url  = enc_params['output']['ingest_url'].rstrip('/')
 
-        ffmpeg_mux_args   = get_dash_mux_args(enc_params)
-        ffmpeg_out_url = '%s/%s ' %(dash_ingest_url,\
+        now = datetime.datetime.now()
+        curr_time = now.strftime('%Y%m%dT%H%M%S')
+
+        ffmpeg_mux_args   = get_dash_mux_args(enc_params, curr_time)
+        ffmpeg_out_url = '%s/%s-%s ' %(dash_ingest_url, curr_time,\
                                     enc_params['output']['dash_master_manifest'])
         ffmpeg_output_args +=  '"[%s]%s' %(ffmpeg_mux_args, ffmpeg_out_url)
 
         if enc_params['output']['b_ingest_url'] != '':
             dash_ingest_url  = enc_params['output']['b_ingest_url'].rstrip('/')
 
-            ffmpeg_mux_args   = get_dash_mux_args(enc_params)
-            ffmpeg_out_url = '%s/%s ' %(dash_ingest_url,\
+            ffmpeg_mux_args   = get_dash_mux_args(enc_params, curr_time)
+            ffmpeg_out_url = '%s/%s-%s ' %(dash_ingest_url, curr_time,\
                                         enc_params['output']['dash_master_manifest'])
             ffmpeg_output_args +=  '|[%s]%s' %(ffmpeg_mux_args, ffmpeg_out_url)
 
